@@ -5,7 +5,88 @@ using Confuser.Renamer.Analyzers;
 using dnlib.DotNet;
 
 namespace Confuser.Renamer {
+	
+
 	internal class AnalyzePhase : ProtectionPhase {
+		readonly HashSet<string> momoBehaviourMethods = new HashSet<string>()
+		{
+			"Awake",
+			"FixedUpdate",
+			"LateUpdate",
+			"OnAnimatorIK",
+			"OnAnimatorMove",
+			"OnApplicationFocus",
+			"OnApplicationPause",
+			"OnApplicationQuit",
+			"OnAudioFilterRead",
+			"OnBecameInvisible",
+			"OnBecameVisible",
+			"OnCollisionEnter",
+			"OnCollisionEnter2D",
+			"OnCollisionExit",
+			"OnCollisionExit2D",
+			"OnCollisionStay",
+			"OnCollisionStay2D",
+			"OnConnectedToServer",
+			"OnControllerColliderHit",
+			"OnDestroy",
+			"OnDisable",
+			"OnDisconnectedFromServer",
+			"OnDrawGizmos",
+			"OnDrawGizmosSelected",
+			"OnEnable",
+			"OnFailedToConnect",
+			"OnFailedToConnectToMasterServer",
+			"OnGUI",
+			"OnJointBreak",
+			"OnJointBreak2D",
+			"OnMasterServerEvent",
+			"OnMouseDown",
+			"OnMouseDrag",
+			"OnMouseEnter",
+			"OnMouseExit",
+			"OnMouseOver",
+			"OnMouseUp",
+			"OnMouseUpAsButton",
+			"OnNetworkInstantiate",
+			"OnParticleCollision",
+			"OnParticleTrigger",
+			"OnPlayerConnected",
+			"OnPlayerDisconnected",
+			"OnPostRender",
+			"OnPreCull",
+			"OnPreRender",
+			"OnRenderImage",
+			"OnRenderObject",
+			"OnSerializeNetworkView",
+			"OnServerInitialized",
+			"OnTransformChildrenChanged",
+			"OnTransformParentChanged",
+			"OnTriggerEnter",
+			"OnTriggerEnter2D",
+			"OnTriggerExit",
+			"OnTriggerExit2D",
+			"OnTriggerStay",
+			"OnTriggerStay2D",
+			"OnValidate",
+			"OnWillRenderObject",
+			"Reset",
+			"Start",
+			"Update"
+		};
+
+		readonly HashSet<string> stateMachineBehaviourMethods = new HashSet<string>()
+		{
+			"OnStateMachineEnter",
+			"OnStateMachineExit",
+			"OnStateEnter",
+			"OnStateExit",
+			"OnStateIK",
+			"OnStateMove",
+			"OnStateUpdate"
+		};
+
+
 		public AnalyzePhase(NameProtection parent)
 			: base(parent) { }
 
@@ -171,8 +252,8 @@ namespace Confuser.Renamer {
 
 		void Analyze(NameService service, ConfuserContext context, ProtectionParameters parameters, MethodDef method) {
 			if (IsVisibleOutside(context, parameters, method.DeclaringType) &&
-			    (method.IsFamily || method.IsFamilyOrAssembly || method.IsPublic) &&
-			    IsVisibleOutside(context, parameters, method))
+				(method.IsFamily || method.IsFamilyOrAssembly || method.IsPublic) &&
+				IsVisibleOutside(context, parameters, method))
 				service.SetCanRename(method, false);
 
 			else if (method.IsRuntimeSpecialName)
@@ -183,6 +264,18 @@ namespace Confuser.Renamer {
 
 			else if (method.DeclaringType.IsComImport() && !method.HasAttribute("System.Runtime.InteropServices.DispIdAttribute"))
 				service.SetCanRename(method, false);
+
+			else if (method.DeclaringType.InheritsFrom("UnityEngine.MonoBehaviour") &&
+				momoBehaviourMethods.Contains(method.Name))
+			{
+				service.SetCanRename(method, false);
+			}
+
+			else if (method.DeclaringType.InheritsFrom("UnityEngine.StateMachineBehaviour") &&
+				stateMachineBehaviourMethods.Contains(method.Name))
+			{
+				service.SetCanRename(method, false);
+			}
 
 			else if (method.DeclaringType.IsDelegate())
 				service.SetCanRename(method, false);
@@ -201,6 +294,10 @@ namespace Confuser.Renamer {
 				return;
 
 			else if (field.DeclaringType.IsSerializable && !field.IsNotSerialized)
+				service.SetCanRename(field, false);
+
+			// unity support
+			else if (field.HasAttribute("UnityEngine.SerializeField"))
 				service.SetCanRename(field, false);
 
 			else if (field.IsLiteral && field.DeclaringType.IsEnum &&
